@@ -939,12 +939,30 @@ fun ReferenceSheetContent(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(char.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(char.color)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(char.name.take(1).uppercase(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(char.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                }
                                 TextButton(onClick = { onInsertText(char.name) }) {
                                     Text("Insert", fontSize = 12.sp)
                                 }
                             }
-                            if (char.occupation.isNotBlank()) Text("Role: ${char.occupation}", style = MaterialTheme.typography.bodySmall)
+                            if (char.roleInStory.isNotBlank() || char.occupation.isNotBlank()) {
+                                val roleText = listOf(char.roleInStory, char.occupation).filter { it.isNotBlank() }.joinToString(" • ")
+                                Text(roleText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            if (char.shortDescription.isNotBlank()) {
+                                Text(char.shortDescription, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                            }
                             if (char.goals.isNotBlank()) Text("Goal: ${char.goals}", style = MaterialTheme.typography.bodySmall)
                             if (char.internalConflict.isNotBlank()) Text("Conflict: ${char.internalConflict}", style = MaterialTheme.typography.bodySmall)
                         }

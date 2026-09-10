@@ -9,6 +9,7 @@ import androidx.room.Update
 import com.example.data.model.ActEntity
 import com.example.data.model.ChapterEntity
 import com.example.data.model.CharacterEntity
+import com.example.data.model.CharacterTemplateEntity
 import com.example.data.model.ProjectEntity
 import com.example.data.model.ProjectSettingsEntity
 import com.example.data.model.RelationshipEntity
@@ -322,4 +323,19 @@ interface ProjectSettingsDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateSettings(settings: ProjectSettingsEntity)
+}
+
+@Dao
+interface CharacterTemplateDao {
+    @Query("SELECT * FROM character_templates WHERE projectId = :projectId ORDER BY name ASC")
+    fun getTemplatesForProject(projectId: String): Flow<List<CharacterTemplateEntity>>
+
+    @Query("SELECT * FROM character_templates WHERE projectId = :projectId ORDER BY name ASC")
+    suspend fun getTemplatesForProjectSync(projectId: String): List<CharacterTemplateEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTemplate(template: CharacterTemplateEntity)
+
+    @Delete
+    suspend fun deleteTemplate(template: CharacterTemplateEntity)
 }

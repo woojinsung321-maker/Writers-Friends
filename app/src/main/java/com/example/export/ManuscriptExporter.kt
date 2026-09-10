@@ -703,9 +703,18 @@ nav#toc li {
                 put("id", ch.id)
                 put("name", ch.name)
                 put("nickname", ch.nickname)
+                put("aliases", ch.aliases)
                 put("age", ch.age)
+                put("dateOfBirth", ch.dateOfBirth)
                 put("gender", ch.gender)
+                put("pronouns", ch.pronouns)
                 put("occupation", ch.occupation)
+                put("roleInStory", ch.roleInStory)
+                put("species", ch.species)
+                put("nationality", ch.nationality)
+                put("currentLocation", ch.currentLocation)
+                put("status", ch.status)
+                put("shortDescription", ch.shortDescription)
                 put("appearance", ch.appearance)
                 put("personality", ch.personality)
                 put("biography", ch.biography)
@@ -714,11 +723,46 @@ nav#toc li {
                 put("fears", ch.fears)
                 put("strengths", ch.strengths)
                 put("weaknesses", ch.weaknesses)
+                put("secrets", ch.secrets)
+                put("characterArc", ch.characterArc)
+                put("internalConflict", ch.internalConflict)
+                put("externalConflict", ch.externalConflict)
+                put("development", ch.development)
                 put("notes", ch.notes)
+                put("tags", ch.tags)
                 put("color", ch.color)
+                put("imageUri", ch.imageUri ?: JSONObject.NULL)
+                put("imageDisplayMode", ch.imageDisplayMode)
+                put("galleryJson", ch.galleryJson)
+                put("appearanceDataJson", ch.appearanceDataJson)
+                put("personalityDataJson", ch.personalityDataJson)
+                put("psychologyDataJson", ch.psychologyDataJson)
+                put("historyDataJson", ch.historyDataJson)
+                put("goalsDataJson", ch.goalsDataJson)
+                put("arcDataJson", ch.arcDataJson)
+                put("voiceDataJson", ch.voiceDataJson)
+                put("knowledgeDataJson", ch.knowledgeDataJson)
+                put("inventoryDataJson", ch.inventoryDataJson)
+                put("locationsDataJson", ch.locationsDataJson)
+                put("customNotesJson", ch.customNotesJson)
+                put("customFields", ch.customFields)
+                put("templateName", ch.templateName)
             })
         }
         root.put("characters", charsArray)
+
+        // Character Templates
+        val templates = db.characterTemplateDao().getTemplatesForProjectSync(projectId)
+        val tmplArray = JSONArray()
+        for (t in templates) {
+            tmplArray.put(JSONObject().apply {
+                put("id", t.id)
+                put("name", t.name)
+                put("description", t.description)
+                put("templateJson", t.templateJson)
+            })
+        }
+        root.put("characterTemplates", tmplArray)
 
         // World Entries
         val world = db.worldEntryDao().getWorldEntriesForProjectSync(projectId)
@@ -905,16 +949,67 @@ nav#toc li {
                             projectId = newProjectId,
                             name = ch.optString("name", "Character"),
                             nickname = ch.optString("nickname", ""),
+                            aliases = ch.optString("aliases", ""),
                             age = ch.optString("age", ""),
+                            dateOfBirth = ch.optString("dateOfBirth", ""),
                             gender = ch.optString("gender", ""),
+                            pronouns = ch.optString("pronouns", ""),
                             occupation = ch.optString("occupation", ""),
+                            roleInStory = ch.optString("roleInStory", ""),
+                            species = ch.optString("species", ""),
+                            nationality = ch.optString("nationality", ""),
+                            currentLocation = ch.optString("currentLocation", ""),
+                            status = ch.optString("status", "Alive"),
+                            shortDescription = ch.optString("shortDescription", ""),
                             appearance = ch.optString("appearance", ""),
                             personality = ch.optString("personality", ""),
                             biography = ch.optString("biography", ""),
                             goals = ch.optString("goals", ""),
                             motivation = ch.optString("motivation", ""),
+                            fears = ch.optString("fears", ""),
+                            strengths = ch.optString("strengths", ""),
+                            weaknesses = ch.optString("weaknesses", ""),
+                            secrets = ch.optString("secrets", ""),
+                            characterArc = ch.optString("characterArc", ""),
+                            internalConflict = ch.optString("internalConflict", ""),
+                            externalConflict = ch.optString("externalConflict", ""),
+                            development = ch.optString("development", ""),
                             notes = ch.optString("notes", ""),
-                            color = ch.optLong("color", 0xFFB45309)
+                            tags = ch.optString("tags", ""),
+                            color = ch.optLong("color", 0xFFB45309),
+                            imageUri = ch.optString("imageUri").takeIf { it.isNotBlank() && it != "null" },
+                            imageDisplayMode = ch.optString("imageDisplayMode", "cover"),
+                            galleryJson = ch.optString("galleryJson", "[]"),
+                            appearanceDataJson = ch.optString("appearanceDataJson", "{}"),
+                            personalityDataJson = ch.optString("personalityDataJson", "{}"),
+                            psychologyDataJson = ch.optString("psychologyDataJson", "{}"),
+                            historyDataJson = ch.optString("historyDataJson", "{}"),
+                            goalsDataJson = ch.optString("goalsDataJson", "[]"),
+                            arcDataJson = ch.optString("arcDataJson", "{}"),
+                            voiceDataJson = ch.optString("voiceDataJson", "{}"),
+                            knowledgeDataJson = ch.optString("knowledgeDataJson", "{}"),
+                            inventoryDataJson = ch.optString("inventoryDataJson", "[]"),
+                            locationsDataJson = ch.optString("locationsDataJson", "{}"),
+                            customNotesJson = ch.optString("customNotesJson", ""),
+                            customFields = ch.optString("customFields", "[]"),
+                            templateName = ch.optString("templateName", "")
+                        )
+                    )
+                }
+            }
+
+            // Restore Character Templates
+            val tmplArray = root.optJSONArray("characterTemplates")
+            if (tmplArray != null) {
+                for (i in 0 until tmplArray.length()) {
+                    val t = tmplArray.getJSONObject(i)
+                    db.characterTemplateDao().insertTemplate(
+                        com.example.data.model.CharacterTemplateEntity(
+                            id = UUID.randomUUID().toString(),
+                            projectId = newProjectId,
+                            name = t.optString("name", "Template"),
+                            description = t.optString("description", ""),
+                            templateJson = t.optString("templateJson", "{}")
                         )
                     )
                 }

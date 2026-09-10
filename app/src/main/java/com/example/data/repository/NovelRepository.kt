@@ -4,6 +4,7 @@ import com.example.data.db.AppDatabase
 import com.example.data.model.ActEntity
 import com.example.data.model.ChapterEntity
 import com.example.data.model.CharacterEntity
+import com.example.data.model.CharacterTemplateEntity
 import com.example.data.model.ProjectEntity
 import com.example.data.model.ProjectSettingsEntity
 import com.example.data.model.RelationshipEntity
@@ -150,6 +151,12 @@ class NovelRepository(private val db: AppDatabase) {
             db.characterDao().insertCharacter(c.copy(id = UUID.randomUUID().toString(), projectId = newProjectId))
         }
 
+        // Duplicate character templates
+        val templates = db.characterTemplateDao().getTemplatesForProjectSync(projectId)
+        for (t in templates) {
+            db.characterTemplateDao().insertTemplate(t.copy(id = UUID.randomUUID().toString(), projectId = newProjectId))
+        }
+
         // Duplicate world entries
         val world = db.worldEntryDao().getWorldEntriesForProjectSync(projectId)
         for (w in world) {
@@ -235,6 +242,18 @@ class NovelRepository(private val db: AppDatabase) {
     suspend fun deleteCharacter(character: CharacterEntity) {
         db.characterDao().deleteCharacter(character)
         db.projectDao().touchProject(character.projectId)
+    }
+
+    // --- Character Templates ---
+    fun getCharacterTemplates(projectId: String): Flow<List<CharacterTemplateEntity>> = db.characterTemplateDao().getTemplatesForProject(projectId)
+    suspend fun getCharacterTemplatesSync(projectId: String): List<CharacterTemplateEntity> = db.characterTemplateDao().getTemplatesForProjectSync(projectId)
+    suspend fun saveCharacterTemplate(template: CharacterTemplateEntity) {
+        db.characterTemplateDao().insertTemplate(template)
+        db.projectDao().touchProject(template.projectId)
+    }
+    suspend fun deleteCharacterTemplate(template: CharacterTemplateEntity) {
+        db.characterTemplateDao().deleteTemplate(template)
+        db.projectDao().touchProject(template.projectId)
     }
 
     // --- World Entries ---

@@ -1,10 +1,16 @@
 package com.example.ui.characters
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,9 +29,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
@@ -40,6 +49,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,7 +57,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -58,7 +68,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,39 +75,73 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.data.model.CharacterEntity
 import com.example.data.model.RelationshipEntity
+import com.example.data.model.SceneEntity
 import com.example.ui.viewmodel.NovelViewModel
+import com.example.util.CharacterImageStorage
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CharactersScreen(
-    viewModel: NovelViewModel
+    viewModel: NovelViewModel,
+    onOpenScene: (SceneEntity) -> Unit = {}
 ) {
     val characters by viewModel.characters.collectAsState()
     val relationships by viewModel.relationships.collectAsState()
 
+    var activeWorkspaceCharacter by remember { mutableStateOf<CharacterEntity?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Characters, 1: Relationships
     var searchQuery by remember { mutableStateOf("") }
+    var selectedRoleFilter by remember { mutableStateOf("All") }
+    var selectedStatusFilter by remember { mutableStateOf("All") }
 
-    var characterToEdit by remember { mutableStateOf<CharacterEntity?>(null) }
-    var showAddCharacterDialog by remember { mutableStateOf(false) }
     var characterToDelete by remember { mutableStateOf<CharacterEntity?>(null) }
-
     var showAddRelationshipDialog by remember { mutableStateOf(false) }
     var relToDelete by remember { mutableStateOf<RelationshipEntity?>(null) }
 
-    val filteredCharacters = characters.filter {
-        if (searchQuery.isBlank()) true
-        else it.name.contains(searchQuery, ignoreCase = true) ||
-                it.occupation.contains(searchQuery, ignoreCase = true) ||
-                it.goals.contains(searchQuery, ignoreCase = true)
+    // If a character is opened in the dedicated workspace:
+    if (activeWorkspaceCharacter != null) {
+        val currentCharId = activeWorkspaceCharacter!!.id
+        // Keep the reference reactive to any updates from the DB
+        val latestChar = characters.firstOrNull { it.id == currentCharId } ?: activeWorkspaceCharacter!!
+
+        CharacterWorkspaceScreen(
+            character = latestChar,
+            viewModel = viewModel,
+            onBack = { activeWorkspaceCharacter = null },
+            onOpenScene = onOpenScene
+        )
+        return
+    }
+
+    val roleFilters = listOf("All", "Protagonist", "Antagonist", "Deuteragonist", "Mentor", "Supporting", "POV")
+    val statusFilters = listOf("All", "Alive", "Deceased", "Missing")
+
+    val filteredCharacters = characters.filter { c ->
+        val matchesQuery = if (searchQuery.isBlank()) true else {
+            c.name.contains(searchQuery, ignoreCase = true) ||
+                    c.nickname.contains(searchQuery, ignoreCase = true) ||
+                    c.aliases.contains(searchQuery, ignoreCase = true) ||
+                    c.occupation.contains(searchQuery, ignoreCase = true) ||
+                    c.roleInStory.contains(searchQuery, ignoreCase = true) ||
+                    c.goals.contains(searchQuery, ignoreCase = true) ||
+                    c.tags.contains(searchQuery, ignoreCase = true) ||
+                    c.shortDescription.contains(searchQuery, ignoreCase = true)
+        }
+        val matchesRole = if (selectedRoleFilter == "All") true else c.roleInStory.equals(selectedRoleFilter, ignoreCase = true)
+        val matchesStatus = if (selectedStatusFilter == "All") true else c.status.equals(selectedStatusFilter, ignoreCase = true)
+
+        matchesQuery && matchesRole && matchesStatus
     }
 
     Scaffold(
@@ -106,9 +149,14 @@ fun CharactersScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Characters & Cast", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            "${characters.size} characters • ${relationships.size} relationships",
+                            text = "Characters & Cast",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Serif
+                        )
+                        Text(
+                            text = "${characters.size} characters • ${relationships.size} relationships",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -122,11 +170,24 @@ fun CharactersScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    if (selectedTab == 0) showAddCharacterDialog = true
-                    else showAddRelationshipDialog = true
+                    if (selectedTab == 0) {
+                        val newId = UUID.randomUUID().toString()
+                        val projectId = viewModel.currentProjectId.value ?: ""
+                        val newChar = CharacterEntity(
+                            id = newId,
+                            projectId = projectId,
+                            name = "New Character",
+                            status = "Alive",
+                            color = 0xFF1E3A8A // Deep bookish navy
+                        )
+                        viewModel.saveCharacter(newChar)
+                        activeWorkspaceCharacter = newChar
+                    } else {
+                        showAddRelationshipDialog = true
+                    }
                 },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(if (selectedTab == 0) "New Character" else "New Relationship") },
+                text = { Text(if (selectedTab == 0) "New Character" else "Map Relationship") },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.testTag("add_character_fab")
@@ -155,12 +216,19 @@ fun CharactersScreen(
             }
 
             if (selectedTab == 0) {
-                // Characters List View
+                // Search bar
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search characters by name, role, goal...") },
+                    placeholder = { Text("Search characters by name, role, occupation, goal...") },
                     leadingIcon = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                        }
+                    },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -168,28 +236,95 @@ fun CharactersScreen(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                if (filteredCharacters.isEmpty()) {
+                // Role Filter Chips
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    items(roleFilters) { role ->
+                        FilterChip(
+                            selected = selectedRoleFilter == role,
+                            onClick = { selectedRoleFilter = role },
+                            label = { Text(role, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+
+                if (characters.isEmpty()) {
+                    // Empty state matching prompt constraints: "Do not create fake characters. The character database starts empty."
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("No characters yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                modifier = Modifier.size(72.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Character Database is Empty",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Serif
+                            )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                "Create character profiles with detailed motivations, flaws, arcs, and relationships.",
+                                text = "Create deep character profiles with multi-section workspaces covering psychology, desires, flaws, transformation arcs, speech patterns, and secrets.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            OutlinedButton(onClick = { showAddCharacterDialog = true }) {
+                            Spacer(modifier = Modifier.height(18.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val newId = UUID.randomUUID().toString()
+                                    val projectId = viewModel.currentProjectId.value ?: ""
+                                    val newChar = CharacterEntity(
+                                        id = newId,
+                                        projectId = projectId,
+                                        name = "New Character",
+                                        status = "Alive",
+                                        color = 0xFF1E3A8A
+                                    )
+                                    viewModel.saveCharacter(newChar)
+                                    activeWorkspaceCharacter = newChar
+                                }
+                            ) {
                                 Icon(Icons.Default.Add, null)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Create First Character")
                             }
                         }
+                    }
+                } else if (filteredCharacters.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No characters match \"$searchQuery\"",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 } else {
                     LazyColumn(
@@ -198,9 +333,9 @@ fun CharactersScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(filteredCharacters, key = { it.id }) { char ->
-                            CharacterCardItem(
+                            CharacterRosterCard(
                                 character = char,
-                                onEdit = { characterToEdit = char },
+                                onClick = { activeWorkspaceCharacter = char },
                                 onDelete = { characterToDelete = char }
                             )
                         }
@@ -210,7 +345,7 @@ fun CharactersScreen(
                     }
                 }
             } else {
-                // Relationships View
+                // Relationships Tab
                 if (relationships.isEmpty()) {
                     Box(
                         modifier = Modifier
@@ -219,12 +354,13 @@ fun CharactersScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("No relationships mapped", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("No relationships mapped yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif)
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                "Connect characters and factions with ties like Friendship, Enmity, Romance, or Mentorship.",
+                                "Map dynamic bonds between cast members like Alliances, Rivalries, Mentorships, or Family Ties.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             OutlinedButton(onClick = { showAddRelationshipDialog = true }) {
@@ -255,30 +391,12 @@ fun CharactersScreen(
         }
     }
 
-    // Modal: Add or Edit Character
-    if (showAddCharacterDialog || characterToEdit != null) {
-        val editing = characterToEdit
-        CharacterDetailDialog(
-            initial = editing,
-            projectId = viewModel.currentProjectId.value ?: "",
-            onDismiss = {
-                showAddCharacterDialog = false
-                characterToEdit = null
-            },
-            onSave = { updated ->
-                viewModel.saveCharacter(updated)
-                showAddCharacterDialog = false
-                characterToEdit = null
-            }
-        )
-    }
-
-    // Dialog: Delete Character
+    // Modal: Delete Character
     characterToDelete?.let { char ->
         AlertDialog(
             onDismissRequest = { characterToDelete = null },
             title = { Text("Delete Character?") },
-            text = { Text("Are you sure you want to remove '${char.name}'?") },
+            text = { Text("Are you sure you want to delete \"${char.name}\"? All notes and details will be removed.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -308,7 +426,7 @@ fun CharactersScreen(
         )
     }
 
-    // Dialog: Delete Relationship
+    // Modal: Delete Relationship
     relToDelete?.let { rel ->
         AlertDialog(
             onDismissRequest = { relToDelete = null },
@@ -332,41 +450,53 @@ fun CharactersScreen(
 }
 
 @Composable
-fun CharacterCardItem(
+fun CharacterRosterCard(
     character: CharacterEntity,
-    onEdit: () -> Unit,
+    onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
 
     ElevatedCard(
-        onClick = onEdit,
-        shape = RoundedCornerShape(16.dp),
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        modifier = Modifier.fillMaxWidth().testTag("character_card_${character.id}")
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("character_card_${character.id}")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // Avatar badge with character color
+            // Avatar or Portrait
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Color(character.color)),
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(character.color).copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = character.name.take(1).uppercase(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                if (character.imageUri != null) {
+                    AsyncImage(
+                        model = CharacterImageStorage.getFileForPath(context, character.imageUri!!),
+                        contentDescription = character.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = character.name.take(1).uppercase().ifBlank { "?" },
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(14.dp))
@@ -377,12 +507,21 @@ fun CharacterCardItem(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = character.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = character.name.ifBlank { "Untitled" },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Serif
+                        )
+                        if (character.nickname.isNotBlank()) {
+                            Text(
+                                text = "\"${character.nickname}\"",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
 
                     Box {
                         IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(28.dp)) {
@@ -390,8 +529,8 @@ fun CharacterCardItem(
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text("Edit Profile") },
-                                onClick = { menuOpen = false; onEdit() },
+                                text = { Text("Open Workspace") },
+                                onClick = { menuOpen = false; onClick() },
                                 leadingIcon = { Icon(Icons.Default.Edit, null) }
                             )
                             DropdownMenuItem(
@@ -403,29 +542,62 @@ fun CharacterCardItem(
                     }
                 }
 
-                if (character.occupation.isNotBlank()) {
-                    Text(
-                        text = character.occupation,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (character.roleInStory.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = character.roleInStory,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (character.status == "Alive") MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                        else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                    ) {
+                        Text(
+                            text = character.status,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (character.status == "Alive") MaterialTheme.colorScheme.onSecondaryContainer
+                            else MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    if (character.occupation.isNotBlank()) {
+                        Text(
+                            text = "• ${character.occupation}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                    }
                 }
 
-                if (character.goals.isNotBlank()) {
+                if (character.shortDescription.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Goal: ${character.goals}",
+                        text = character.shortDescription,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2
                     )
-                }
-
-                if (character.internalConflict.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
+                } else if (character.goals.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Conflict: ${character.internalConflict}",
+                        text = "Goal: ${character.goals}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
@@ -490,238 +662,6 @@ fun RelationshipCardItem(
             }
         }
     }
-}
-
-@Composable
-fun CharacterDetailDialog(
-    initial: CharacterEntity?,
-    projectId: String,
-    onDismiss: () -> Unit,
-    onSave: (CharacterEntity) -> Unit
-) {
-    var selectedSection by remember { mutableIntStateOf(0) } // 0: Basic, 1: Psychology & Arc, 2: Notes
-
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var nickname by remember { mutableStateOf(initial?.nickname ?: "") }
-    var age by remember { mutableStateOf(initial?.age ?: "") }
-    var gender by remember { mutableStateOf(initial?.gender ?: "") }
-    var occupation by remember { mutableStateOf(initial?.occupation ?: "") }
-    var appearance by remember { mutableStateOf(initial?.appearance ?: "") }
-    var personality by remember { mutableStateOf(initial?.personality ?: "") }
-
-    var goals by remember { mutableStateOf(initial?.goals ?: "") }
-    var motivation by remember { mutableStateOf(initial?.motivation ?: "") }
-    var fears by remember { mutableStateOf(initial?.fears ?: "") }
-    var strengths by remember { mutableStateOf(initial?.strengths ?: "") }
-    var weaknesses by remember { mutableStateOf(initial?.weaknesses ?: "") }
-    var secrets by remember { mutableStateOf(initial?.secrets ?: "") }
-    var characterArc by remember { mutableStateOf(initial?.characterArc ?: "") }
-    var internalConflict by remember { mutableStateOf(initial?.internalConflict ?: "") }
-    var notes by remember { mutableStateOf(initial?.notes ?: "") }
-    var selectedColor by remember { mutableLongStateOf(initial?.color ?: 0xFFB45309) }
-
-    val presetColors = listOf(
-        0xFFB45309, 0xFF312E81, 0xFF047857, 0xFF9D174D, 0xFF1E293B, 0xFF6D28D9, 0xFFC2410C
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(if (initial == null) "New Character Profile" else "Edit: ${initial.name}")
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Profile Section Tabs
-                ScrollableTabRow(
-                    selectedTabIndex = selectedSection,
-                    edgePadding = 0.dp
-                ) {
-                    Tab(selected = selectedSection == 0, onClick = { selectedSection = 0 }, text = { Text("Profile") })
-                    Tab(selected = selectedSection == 1, onClick = { selectedSection = 1 }, text = { Text("Arc & Psychology") })
-                    Tab(selected = selectedSection == 2, onClick = { selectedSection = 2 }, text = { Text("Appearance & Lore") })
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                if (selectedSection == 0) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Character Name *") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("character_name_input")
-                    )
-                    OutlinedTextField(
-                        value = nickname,
-                        onValueChange = { nickname = it },
-                        label = { Text("Alias / Nickname") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = age,
-                            onValueChange = { age = it },
-                            label = { Text("Age") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = gender,
-                            onValueChange = { gender = it },
-                            label = { Text("Gender") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    OutlinedTextField(
-                        value = occupation,
-                        onValueChange = { occupation = it },
-                        label = { Text("Role / Occupation (e.g. Inquisitor, Pilot)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = personality,
-                        onValueChange = { personality = it },
-                        label = { Text("Personality Traits") },
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Text("Avatar Color Tag", style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        presetColors.forEach { c ->
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(c))
-                                    .clickable { selectedColor = c },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (selectedColor == c) {
-                                    Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-                    }
-                } else if (selectedSection == 1) {
-                    OutlinedTextField(
-                        value = goals,
-                        onValueChange = { goals = it },
-                        label = { Text("Core Desire / Objective (What do they want?)") },
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = motivation,
-                        onValueChange = { motivation = it },
-                        label = { Text("Motivation (Why do they want it?)") },
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = internalConflict,
-                        onValueChange = { internalConflict = it },
-                        label = { Text("Internal Conflict / Moral Dilemma") },
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = characterArc,
-                        onValueChange = { characterArc = it },
-                        label = { Text("Character Arc (How do they transform?)") },
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = fears,
-                        onValueChange = { fears = it },
-                        label = { Text("Deepest Fear / Vulnerability") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = secrets,
-                        onValueChange = { secrets = it },
-                        label = { Text("Secret / Hidden Past") },
-                        maxLines = 2,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
-                    OutlinedTextField(
-                        value = appearance,
-                        onValueChange = { appearance = it },
-                        label = { Text("Physical Appearance & Attire") },
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = strengths,
-                        onValueChange = { strengths = it },
-                        label = { Text("Strengths & Talents") },
-                        maxLines = 2,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = weaknesses,
-                        onValueChange = { weaknesses = it },
-                        label = { Text("Weaknesses & Flaws") },
-                        maxLines = 2,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = notes,
-                        onValueChange = { notes = it },
-                        label = { Text("Additional Author Notes") },
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        val toSave = (initial ?: CharacterEntity(projectId = projectId, name = name)).copy(
-                            name = name,
-                            nickname = nickname,
-                            age = age,
-                            gender = gender,
-                            occupation = occupation,
-                            appearance = appearance,
-                            personality = personality,
-                            goals = goals,
-                            motivation = motivation,
-                            fears = fears,
-                            strengths = strengths,
-                            weaknesses = weaknesses,
-                            secrets = secrets,
-                            characterArc = characterArc,
-                            internalConflict = internalConflict,
-                            notes = notes,
-                            color = selectedColor
-                        )
-                        onSave(toSave)
-                    }
-                },
-                enabled = name.isNotBlank(),
-                modifier = Modifier.testTag("confirm_save_character_button")
-            ) {
-                Text("Save Profile")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
 }
 
 @Composable

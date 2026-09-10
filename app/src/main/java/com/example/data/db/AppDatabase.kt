@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import com.example.data.dao.ActDao
 import com.example.data.dao.ChapterDao
 import com.example.data.dao.CharacterDao
+import com.example.data.dao.CharacterTemplateDao
 import com.example.data.dao.ProjectDao
 import com.example.data.dao.ProjectSettingsDao
 import com.example.data.dao.RelationshipDao
@@ -20,6 +21,7 @@ import com.example.data.dao.WritingSessionDao
 import com.example.data.model.ActEntity
 import com.example.data.model.ChapterEntity
 import com.example.data.model.CharacterEntity
+import com.example.data.model.CharacterTemplateEntity
 import com.example.data.model.ProjectEntity
 import com.example.data.model.ProjectSettingsEntity
 import com.example.data.model.RelationshipEntity
@@ -38,6 +40,7 @@ import com.example.data.model.WritingSessionEntity
         ChapterEntity::class,
         SceneEntity::class,
         CharacterEntity::class,
+        CharacterTemplateEntity::class,
         WorldEntryEntity::class,
         RelationshipEntity::class,
         SubplotEntity::class,
@@ -47,7 +50,7 @@ import com.example.data.model.WritingSessionEntity
         SceneVersionEntity::class,
         ProjectSettingsEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -56,6 +59,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chapterDao(): ChapterDao
     abstract fun sceneDao(): SceneDao
     abstract fun characterDao(): CharacterDao
+    abstract fun characterTemplateDao(): CharacterTemplateDao
     abstract fun worldEntryDao(): WorldEntryDao
     abstract fun relationshipDao(): RelationshipDao
     abstract fun subplotDao(): SubplotDao

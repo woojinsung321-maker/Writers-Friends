@@ -281,7 +281,13 @@ fun ProjectWorkspaceScreen(
                             )
                         }
                         WorkspaceTab.CHARACTERS -> {
-                            CharactersScreen(viewModel = viewModel)
+                            CharactersScreen(
+                                viewModel = viewModel,
+                                onOpenScene = { scene ->
+                                    viewModel.setActiveScene(scene)
+                                    viewModel.selectTab(WorkspaceTab.WRITE)
+                                }
+                            )
                         }
                         WorkspaceTab.WORLD -> {
                             WorldScreen(viewModel = viewModel)

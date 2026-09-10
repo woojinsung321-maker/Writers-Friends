@@ -153,8 +153,54 @@ data class CharacterEntity(
     val tags: String = "",
     val color: Long = 0xFFB45309,
     val imageUri: String? = null,
-    val customFields: String = "{}", // JSON map of custom attributes
-    val updatedAt: Long = System.currentTimeMillis()
+    val customFields: String = "[]", // JSON array of custom field objects or JSON map
+    val updatedAt: Long = System.currentTimeMillis(),
+
+    // Extended Character Attributes
+    val aliases: String = "",
+    val dateOfBirth: String = "",
+    val pronouns: String = "",
+    val roleInStory: String = "",
+    val species: String = "",
+    val nationality: String = "",
+    val currentLocation: String = "",
+    val status: String = "Alive", // Alive, Deceased, Missing, Unknown, Inactive, Transformed
+    val shortDescription: String = "",
+    val imageDisplayMode: String = "cover", // cover, contain, fill
+    val galleryJson: String = "[]", // JSON array of CharacterGalleryItem
+    val appearanceDataJson: String = "{}", // CharacterAppearanceData
+    val personalityDataJson: String = "{}", // CharacterPersonalityData
+    val psychologyDataJson: String = "{}", // CharacterPsychologyData
+    val historyDataJson: String = "{}", // CharacterHistoryData
+    val goalsDataJson: String = "[]", // JSON array of CharacterGoalItem
+    val arcDataJson: String = "{}", // CharacterArcData
+    val voiceDataJson: String = "{}", // CharacterVoiceData
+    val knowledgeDataJson: String = "{}", // CharacterKnowledgeData
+    val inventoryDataJson: String = "[]", // JSON array of CharacterInventoryItem
+    val locationsDataJson: String = "{}", // CharacterLocationsData
+    val customNotesJson: String = "", // Free-form unrestricted notes
+    val templateName: String = ""
+)
+
+@Entity(
+    tableName = "character_templates",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProjectEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("projectId")]
+)
+data class CharacterTemplateEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val projectId: String,
+    val name: String,
+    val description: String = "",
+    val templateJson: String = "{}",
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(

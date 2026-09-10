@@ -15,6 +15,7 @@ import com.example.data.db.AppDatabase
 import com.example.data.model.ActEntity
 import com.example.data.model.ChapterEntity
 import com.example.data.model.CharacterEntity
+import com.example.data.model.CharacterTemplateEntity
 import com.example.data.model.ProjectEntity
 import com.example.data.model.ProjectSettingsEntity
 import com.example.data.model.RelationshipEntity
@@ -76,6 +77,9 @@ class NovelViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _characters = MutableStateFlow<List<CharacterEntity>>(emptyList())
     val characters = _characters.asStateFlow()
+
+    private val _characterTemplates = MutableStateFlow<List<CharacterTemplateEntity>>(emptyList())
+    val characterTemplates = _characterTemplates.asStateFlow()
 
     private val _worldEntries = MutableStateFlow<List<WorldEntryEntity>>(emptyList())
     val worldEntries = _worldEntries.asStateFlow()
@@ -147,6 +151,7 @@ class NovelViewModel(application: Application) : AndroidViewModel(application) {
             _chapters.value = emptyList()
             _scenes.value = emptyList()
             _characters.value = emptyList()
+            _characterTemplates.value = emptyList()
             _worldEntries.value = emptyList()
             _relationships.value = emptyList()
             _subplots.value = emptyList()
@@ -185,6 +190,9 @@ class NovelViewModel(application: Application) : AndroidViewModel(application) {
             }
             launch {
                 repository.getCharacters(projectId).collect { _characters.value = it }
+            }
+            launch {
+                repository.getCharacterTemplates(projectId).collect { _characterTemplates.value = it }
             }
             launch {
                 repository.getWorldEntries(projectId).collect { _worldEntries.value = it }
@@ -469,6 +477,14 @@ class NovelViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteCharacter(character: CharacterEntity) {
         viewModelScope.launch { repository.deleteCharacter(character) }
+    }
+
+    fun saveCharacterTemplate(template: CharacterTemplateEntity) {
+        viewModelScope.launch { repository.saveCharacterTemplate(template) }
+    }
+
+    fun deleteCharacterTemplate(template: CharacterTemplateEntity) {
+        viewModelScope.launch { repository.deleteCharacterTemplate(template) }
     }
 
     // --- World Entries ---
