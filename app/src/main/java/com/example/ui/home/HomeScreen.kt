@@ -66,6 +66,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import com.example.ui.info.DeveloperInfoDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -109,6 +110,7 @@ fun HomeScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var showRestoreDialog by remember { mutableStateOf(false) }
+    var showDeveloperInfoDialog by remember { mutableStateOf(false) }
     var projectToEdit by remember { mutableStateOf<ProjectEntity?>(null) }
     var projectToDelete by remember { mutableStateOf<ProjectEntity?>(null) }
 
@@ -169,10 +171,13 @@ fun HomeScreen(
                         Icon(Icons.Default.Backup, contentDescription = "Restore Backup")
                     }
                     IconButton(
-                        onClick = onOpenGuide,
-                        modifier = Modifier.testTag("guide_button")
+                        onClick = {
+                            showDeveloperInfoDialog = true
+                            onOpenGuide()
+                        },
+                        modifier = Modifier.testTag("developer_info_button")
                     ) {
-                        Icon(Icons.Default.HelpOutline, contentDescription = "Writing Guide")
+                        Icon(Icons.Default.HelpOutline, contentDescription = "Developer Information")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -405,6 +410,13 @@ fun HomeScreen(
                     onOpenProject(restoredId)
                 }
             }
+        )
+    }
+
+    // Dialog: Developer Information Page
+    if (showDeveloperInfoDialog) {
+        DeveloperInfoDialog(
+            onDismiss = { showDeveloperInfoDialog = false }
         )
     }
 }
